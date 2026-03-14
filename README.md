@@ -35,8 +35,6 @@ GAME STATS
     
     - Bots (Live): Bots that moved during the game.
     
-    - Bots (Stat): Stationary bots that remained in one place.
-    
     - PvP: Total kills between human players (Kill event).
     
     - BotDeaths: Number of bots killed by humans (BotKill event).
