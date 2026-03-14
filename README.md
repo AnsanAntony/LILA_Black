@@ -1,4 +1,4 @@
-**IMPORTANT NOTE THE MAP IMAGE MIGHT TAKE TIME TO LOAD AS THE SERVER IS A LITTLE SLOW** 
+**IMPORTANT NOTE** : **The map image might take time to load as the server is a little slow.**
 
 
 LILA BLACK REPLAY ANALYTICS - USER GUIDE
