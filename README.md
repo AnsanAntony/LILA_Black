@@ -31,17 +31,19 @@ MAP CONTROLS
 GAME STATS
     (The stats bar displays real-time data for your match)
 
-    - Players: Total unique humans identified.
+    - Players: Total unique human players identified.
     
-    - Bots (Live): Bots that have moved during the game.
+    - Bots (Live): Bots that moved during the game.
     
     - Bots (Stat): Stationary bots that remained in one place.
     
-    - PvP: Total kills between human players.
+    - PvP: Total kills between human players (Kill event).
     
-    - BotDeath: Total number of bots eliminated.
+    - BotDeaths: Number of bots killed by humans (BotKill event).
     
-    - Storm: Kills caused by the environment or storm.
+    - PlayerLost: Number of humans killed by bots (BotKilled event).
+    
+    - Storm: Kills caused by the environment or storm (KilledByStorm).
     
     - Loot: Total number of loot events recorded.
 
