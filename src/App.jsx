@@ -37,6 +37,68 @@ const App = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
+  const [isZoomEnabled, setIsZoomEnabled] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(4.0); // 2x Zoom
+  const [zoomCenter, setZoomCenter] = useState({ x: 50, y: 50 }); // Percentage-based
+  const [isDragging, setIsDragging] = useState(false);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const zoomCanvasRef = useRef(null); // Add this ref
+  const [mapImage, setMapImage] = useState(null); // Replace your old loading logic
+  const [isImageLoaded, setIsImageLoaded] = useState(false);
+  const matchStats = useMemo(() => {
+    if (!parquetData) return null;
+    const stats = {
+      humans: new Set(),
+      stationaryBots: new Set(),
+      movingBots: new Set(),
+      pvpKills: 0,
+      botKills: 0, // Bot deaths
+      envKills: 0,
+      lootCount: 0,
+      posHistory: {} // Stores first position to detect movement
+    };
+
+    parquetData.forEach(row => {
+      const id = row[2]; // Attacker/Entity ID
+      const x = row[4]; // X Position
+      const y = row[5]; // Y Position
+      const event = String(row[7] || "");
+
+      // Track movement for Bots
+      if (id?.includes('Bot')) {
+        if (!stats.posHistory[id]) stats.posHistory[id] = { x, y };
+        else if (Math.abs(stats.posHistory[id].x - x) > 1 || Math.abs(stats.posHistory[id].y - y) > 1) {
+          stats.movingBots.add(id);
+        }
+      } else if (id) {
+        stats.humans.add(id);
+      }
+
+      // Kill/Loot Logic
+      if (event.includes('Kill') || event.includes('Killed')) {
+        if (event.includes('ByStorm')) stats.envKills++;
+        else if (event.includes('Bot')) stats.botKills++;
+        else stats.pvpKills++;
+      } else if (event.includes('Loot')) stats.lootCount++;
+    });
+
+    // Identify stationary bots (those in list but not in moving set)
+    Object.keys(stats.posHistory).forEach(id => {
+      if (!stats.movingBots.has(id)) stats.stationaryBots.add(id);
+    });
+
+    return {
+      humanCount: stats.humans.size,
+      movingBotCount: stats.movingBots.size,
+      stationaryBotCount: stats.stationaryBots.size,
+      pvpKills: stats.pvpKills,
+      botKills: stats.botKills,
+      envKills: stats.envKills,
+      lootCount: stats.lootCount
+    };
+  }, [parquetData]);
 
   const canvasRef = useRef(null);
 
@@ -105,11 +167,109 @@ const App = () => {
   }, [isPlaying, currentTime, timeRange.max, playbackSpeed]);
 
   useEffect(() => {
-    if (!parquetData || !canvasRef.current) return;
+    if (isZoomEnabled && parquetData) {
+      const config = MAP_CONFIGS[selectedMap];
+      // We reverse the data to find the "latest" position relative to the current time
+      const currentPlayerPos = [...parquetData].reverse().find(row =>
+        row[6] * 1000 <= currentTime && row[7]?.includes('Position') && !row[7]?.includes('Bot')
+      );
+
+      if (currentPlayerPos) {
+        const u = (currentPlayerPos[3] - config.originX) / config.scale;
+        const v = 1 - ((currentPlayerPos[5] - config.originZ) / config.scale);
+        setZoomCenter({ x: u * 100, y: v * 100 });
+      }
+    }
+  }, [currentTime, isZoomEnabled, parquetData, selectedMap]);
+
+  useEffect(() => {
+    const img = new Image();
+    img.src = new URL(`./assets/minimaps/${selectedMap}_Minimap.${MAP_CONFIGS[selectedMap].ext}`, import.meta.url).href;
+    img.onload = () => {
+      setMapImage(img);
+      setIsImageLoaded(true);
+    };
+  }, [selectedMap]);
+
+  // useEffect(() => {
+  //   if (!parquetData || !canvasRef.current || !mapImage || !isImageLoaded) return;
+  //   const canvas = canvasRef.current;
+  //   const ctx = canvas.getContext('2d');
+  //   const config = MAP_CONFIGS[selectedMap];
+
+  //   ctx.clearRect(0, 0, 1024, 1024);
+  //   ctx.drawImage(mapImage, 0, 0, 1024, 1024);
+
+  //   // 2. Draw Points
+  //   parquetData.forEach(row => {
+  //     const ts = row[6] * 1000;
+  //     const event = String(row[7] || "");
+  //     const x = row[3];
+  //     const z = row[5];
+
+  //     if (ts <= currentTime) {
+  //       let shouldDraw = false;
+  //       let color = 'white';
+  //       let size = 2;
+
+  //       // ... keep your existing if/else filter logic here ...
+  //       if (event.includes('Position') && !event.includes('Bot')) {
+  //         if (filters.showHumanMove) { shouldDraw = true; color = '#00FF00'; size = 2; }
+  //       } else if (event.includes('BotPosition')) {
+  //         if (filters.showBotMove) { shouldDraw = true; color = '#FFFFFF'; size = 2; }
+  //       } else if (event.includes('Kill') || event.includes('Killed')) {
+  //         if (event.includes('Bot')) {
+  //           if (filters.showBotCombat) { shouldDraw = true; color = '#FF4500'; size = 8; }
+  //         } else {
+  //           if (filters.showPvP) { shouldDraw = true; color = '#FFFF00'; size = 8; }
+  //         }
+  //       } else if (event.includes('KilledByStorm')) {
+  //         if (filters.showEnv) { shouldDraw = true; color = '#FF00FF'; size = 10; }
+  //       } else if (event.includes('Loot')) {
+  //         if (filters.showLoot) { shouldDraw = true; color = '#00FFFF'; size = 4; }
+  //       }
+
+  //       if (shouldDraw) {
+  //         const u = (x - config.originX) / config.scale;
+  //         const v = (z - config.originZ) / config.scale;
+  //         ctx.beginPath();
+  //         ctx.fillStyle = color;
+  //         ctx.arc(u * 1024, (1 - v) * 1024, size, 0, Math.PI * 2);
+  //         ctx.fill();
+  //       }
+  //     }
+  //   });
+
+  //   // 3. Draw Lens
+  //   if (isZoomEnabled) {
+  //     const lensSize = 250;
+  //     ctx.strokeStyle = '#4caf50';
+  //     ctx.lineWidth = 4;
+  //     ctx.strokeRect(20, 20, 300, 300);
+
+  //     ctx.save();
+  //     ctx.beginPath();
+  //     ctx.rect(20, 20, 300, 300);
+  //     ctx.clip();
+  //     ctx.drawImage(
+  //       canvas,
+  //       mousePos.x - (lensSize / 2), mousePos.y - (lensSize / 2), lensSize, lensSize,
+  //       20, 20, 300, 300
+  //     );
+  //     ctx.restore();
+  //   }
+  // }, [parquetData, filters, selectedMap, currentTime, isZoomEnabled, mousePos, mapImage]);
+
+  useEffect(() => {
+    if (!parquetData || !canvasRef.current || !mapImage || !isImageLoaded) return;
+
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const config = MAP_CONFIGS[selectedMap];
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 1. Draw Map & Dots on Main Canvas
+    ctx.clearRect(0, 0, 1024, 1024);
+    ctx.drawImage(mapImage, 0, 0, 1024, 1024);
 
     parquetData.forEach(row => {
       const ts = row[6] * 1000;
@@ -122,23 +282,20 @@ const App = () => {
         let color = 'white';
         let size = 2;
 
+        // Filter logic
         if (event.includes('Position') && !event.includes('Bot')) {
           if (filters.showHumanMove) { shouldDraw = true; color = '#00FF00'; size = 2; }
-        }
-        else if (event.includes('BotPosition')) {
+        } else if (event.includes('BotPosition')) {
           if (filters.showBotMove) { shouldDraw = true; color = '#FFFFFF'; size = 2; }
-        }
-        else if (event.includes('Kill') || event.includes('Killed')) {
+        } else if (event.includes('Kill') || event.includes('Killed')) {
           if (event.includes('Bot')) {
             if (filters.showBotCombat) { shouldDraw = true; color = '#FF4500'; size = 8; }
           } else {
             if (filters.showPvP) { shouldDraw = true; color = '#FFFF00'; size = 8; }
           }
-        }
-        else if (event.includes('KilledByStorm')) {
+        } else if (event.includes('KilledByStorm')) {
           if (filters.showEnv) { shouldDraw = true; color = '#FF00FF'; size = 10; }
-        }
-        else if (event.includes('Loot')) {
+        } else if (event.includes('Loot')) {
           if (filters.showLoot) { shouldDraw = true; color = '#00FFFF'; size = 4; }
         }
 
@@ -152,8 +309,23 @@ const App = () => {
         }
       }
     });
-  }, [parquetData, filters, selectedMap, currentTime]);
 
+    // 2. Draw zoomed section to the SEPARATE window
+    if (isZoomEnabled && zoomCanvasRef.current) {
+      const zoomCtx = zoomCanvasRef.current.getContext('2d');
+      const lensSize = 250;
+
+      // Clear and draw the zoomed portion from the main canvas to the zoom canvas
+      zoomCtx.clearRect(0, 0, 300, 300);
+      zoomCtx.drawImage(
+        canvas,
+        mousePos.x - (lensSize / 2),
+        mousePos.y - (lensSize / 2),
+        lensSize, lensSize, // Source: grabbed from main canvas
+        0, 0, 300, 300      // Destination: stretched to fit the 300x300 zoom window
+      );
+    }
+  }, [parquetData, filters, selectedMap, currentTime, isZoomEnabled, mousePos, mapImage, isImageLoaded]);
   const isMatchEnded = currentTime >= timeRange.max && parquetData;
 
   const handleMainButtonClick = () => {
@@ -194,7 +366,7 @@ const App = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
               <label><strong>2. Speed</strong></label>
               <div style={{ display: 'flex', gap: '5px' }}>
-                {[1.0, 2.0, 4.0, 6.0, 10.0, 20.0].map(speed => (
+                {[1.0, 2.0, 10.0, 20.0, 30.0, 40.0].map(speed => (
                   <button key={speed} onClick={() => setPlaybackSpeed(speed)}
                     style={{ padding: '4px 8px', fontSize: '11px', background: playbackSpeed === speed ? '#4caf50' : '#333', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}
                   >
@@ -217,6 +389,7 @@ const App = () => {
               </div>
             </div>
 
+            {/* 4. Layers (Existing) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
               <label><strong>4. Layers</strong></label>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -228,34 +401,58 @@ const App = () => {
                 ))}
               </div>
             </div>
+
+            {/* 5. Camera (New Line added) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', borderLeft: '1px solid #444', paddingLeft: '20px' }}>
+              <label><strong>5. Camera</strong></label>
+              <button onClick={() => setIsZoomEnabled(!isZoomEnabled)} style={{ padding: '4px 8px', fontSize: '11px', background: isZoomEnabled ? '#2196F3' : '#333', border: 'none', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}>
+                {isZoomEnabled ? "DISABLE ZOOM" : "ENABLE ZOOM (FOLLOW)"}
+              </button>
+            </div>
+
+            {/* 6. Game Stats (New Line added) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', borderLeft: '1px solid #444', paddingLeft: '20px' }}>
+              <label><strong>6. Game Stats</strong></label>
+              <div style={{ display: 'flex', gap: '8px', fontSize: '11px', background: '#000', padding: '4px 8px', borderRadius: '4px', height: '24px', alignItems: 'center', border: '1px solid #444' }}>
+                {matchStats ? (
+                  <>
+                    <span style={{ color: '#00FF00' }}>Players: {matchStats.humanCount}</span>
+                    <span style={{ color: '#ffffff' }}>Bots (Live): {matchStats.movingBotCount}</span>
+                    <span style={{ color: '#FFFF00' }}>PvP: {matchStats.pvpKills}</span>
+                    <span style={{ color: '#FF4500' }}>BotDeath: {matchStats.botKills}</span>
+                    <span style={{ color: '#FF00FF' }}>Storm: {matchStats.envKills}</span>
+                    <span style={{ color: '#00FFFF' }}>Loot: {matchStats.lootCount}</span>
+                  </>
+                ) : <span style={{ color: '#666' }}>No data</span>}
+              </div>
+            </div>
           </>
         )}
       </div>
 
       {!parquetData ? (
-        <div style={{
-          width: '90vh', maxWidth: '100%', aspectRatio: '1/1', background: '#181818',
-          borderRadius: '12px', border: '2px dashed #333', display: 'flex',
-          flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: '#666'
-        }}>
+        <div style={{ width: '90vh', maxWidth: '100%', aspectRatio: '1/1', background: '#181818', borderRadius: '12px', border: '2px dashed #333', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: '#666' }}>
           <div style={{ fontSize: '48px', marginBottom: '10px' }}>📄</div>
           <p style={{ margin: 0, fontWeight: '500' }}>Waiting for the telemetry document...</p>
         </div>
       ) : (
         <>
-          <div style={{
-            position: 'relative', width: '90vh', maxWidth: '100%', aspectRatio: '1/1',
-            background: '#000', borderRadius: '8px', border: '2px solid #333', overflow: 'hidden'
-          }}>
-            <img
-              src={new URL(`./assets/minimaps/${selectedMap}_Minimap.${MAP_CONFIGS[selectedMap].ext}`, import.meta.url).href}
-              style={{ width: '100%', height: '100%', opacity: 0.6, objectFit: 'contain' }}
-              alt="minimap"
-            />
-            <canvas ref={canvasRef} width="1024" height="1024" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', justifyContent: 'center', marginTop: '20px' }}>
+            <div style={{ display: isZoomEnabled ? 'block' : 'none' }}>
+              <h4 style={{ margin: '0 0 5px 0', fontSize: '12px', color: '#4caf50' }}>DETAIL VIEW</h4>
+              <div style={{ width: '300px', height: '300px', background: '#000', border: '2px solid #4caf50', borderRadius: '8px', overflow: 'hidden' }}>
+                <canvas ref={zoomCanvasRef} width="300" height="300" style={{ width: '100%', height: '100%' }} />
+              </div>
+            </div>
+            <div onMouseMove={(e) => { const rect = e.currentTarget.getBoundingClientRect(); setMousePos({ x: ((e.clientX - rect.left) / rect.width) * 1024, y: ((e.clientY - rect.top) / rect.height) * 1024 }); }}
+              style={{ position: 'relative', width: '90vh', maxWidth: '100%', aspectRatio: '1/1', background: '#000', borderRadius: '8px', border: '2px solid #333', overflow: 'hidden', cursor: 'crosshair' }}
+            >
+              <canvas ref={canvasRef} width="1024" height="1024" style={{ width: '100%', height: '100%' }} />
+            </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '15px', marginTop: '20px', padding: '15px', background: '#1e1e1e', borderRadius: '8px', width: '100%', maxWidth: '90vh', justifyContent: 'center', flexWrap: 'wrap' }}>
+          {/* Legend added back here */}
+          <div style={{ display: 'flex', gap: '20px', marginTop: '20px', padding: '15px', background: '#1e1e1e', borderRadius: '8px', width: '100%', maxWidth: 'calc(90vh + 320px)', justifyContent: 'center', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px' }}><div style={{ width: 8, height: 8, background: '#00FF00', borderRadius: '50%' }} /> Player</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px' }}><div style={{ width: 8, height: 8, background: '#FFFFFF', borderRadius: '50%' }} /> Bot</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px' }}><div style={{ width: 8, height: 8, background: '#FFFF00', borderRadius: '50%' }} /> PvP Kill</div>
@@ -267,6 +464,6 @@ const App = () => {
       )}
     </div>
   );
-};
+}
 
 export default App;
