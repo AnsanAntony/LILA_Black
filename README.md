@@ -1,8 +1,5 @@
-<<<<<<< HEAD
-=======
 **Published Link : ansnntny-lilatest.netlify.app**
 
->>>>>>> d9bf271e0f2ee52eebd2ce968db60782b3f09875
 **IMPORTANT NOTE** : **The map image might take time to load as the server is a little slow.**
 
 
