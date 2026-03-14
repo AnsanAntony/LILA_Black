@@ -1,16 +1,69 @@
-# React + Vite
+LILA BLACK REPLAY ANALYTICS - USER GUIDE
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+    - This tool is designed to help you visualize and analyze your game telemetry data. Follow these instructions to get started.
 
-Currently, two official plugins are available:
+LOADING DATA
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+    - Locate the "Source File" section at the top of the page.
+    
+    - Click the "Choose File" button.
+    
+    - Select your telemetry data file from your computer.
+    
+    - The map will appear once the file is fully processed.
 
-## React Compiler
+CONTROLLING THE REPLAY
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+    - Speed: Select a playback speed (1.0x to 40.0x) to control how fast the replay moves.
+    
+    - Timeline: Use the PLAY/PAUSE button to start or stop the animation.
+    
+    - Slider: Drag the horizontal slider to jump to any specific point in the match timeline.
+    
+    - Reset: If the match ends, the button will change to RESET, allowing you to reload the current file.
 
-## Expanding the ESLint configuration
+MAP CONTROLS
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+    - Layers: Use the checkboxes to show or hide specific map elements like players, bots, kills, or loot.
+    
+    - Camera: Click "ENABLE ZOOM" to focus the view on active gameplay. The detail view will follow the action.
+
+GAME STATS
+    (The stats bar displays real-time data for your match)
+
+    - Players: Total unique humans identified.
+    
+    - Bots (Live): Bots that have moved during the game.
+    
+    - Bots (Stat): Stationary bots that remained in one place.
+    
+    - PvP: Total kills between human players.
+    
+    - BotDeath: Total number of bots eliminated.
+    
+    - Storm: Kills caused by the environment or storm.
+    
+    - Loot: Total number of loot events recorded.
+
+LEGEND
+    (Use these icons to understand the markers on the map)
+
+    - Player: Green dot
+    
+    - Bot: White dot
+    
+    - PvP Kill: Yellow dot
+    
+    - Bot Death: Red-Orange dot
+    
+    - Storm/Env Kill: Pink dot
+    
+    - Loot: Cyan dot
+
+TROUBLESHOOTING
+    
+    - If the screen says "Waiting for the telemetry document," ensure your file has been selected correctly.
+    
+    - If the replay is moving too fast to track, select "Real" or "2x" speed in the Speed section.
+    
+    - Ensure your browser is up to date for the best performance.
