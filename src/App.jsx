@@ -51,51 +51,49 @@ const App = () => {
     if (!parquetData) return null;
     const stats = {
       humans: new Set(),
-      stationaryBots: new Set(),
       movingBots: new Set(),
-      pvpKills: 0,
-      botKills: 0, // Bot deaths
-      envKills: 0,
-      lootCount: 0,
-      posHistory: {} // Stores first position to detect movement
+      pvpKills: 0,       // Event: Kill
+      botDeaths: 0,      // Event: BotKill (Human kills bot)
+      playerDeaths: 0,   // Event: BotKilled (Bot kills human)
+      stormKills: 0,     // Event: KilledByStorm
+      lootCount: 0,      // Event: Loot
+      posHistory: {}     // To track BotPosition movement
     };
 
     parquetData.forEach(row => {
-      const id = row[2]; // Attacker/Entity ID
-      const x = row[4]; // X Position
-      const y = row[5]; // Y Position
+      const id = row[2];
+      const x = row[4];
+      const y = row[5];
       const event = String(row[7] || "");
 
-      // Track movement for Bots
-      if (id?.includes('Bot')) {
+      // 1. Entity & Movement Tracking
+      if (event === "BotPosition") {
         if (!stats.posHistory[id]) stats.posHistory[id] = { x, y };
         else if (Math.abs(stats.posHistory[id].x - x) > 1 || Math.abs(stats.posHistory[id].y - y) > 1) {
           stats.movingBots.add(id);
         }
-      } else if (id) {
-        stats.humans.add(id);
+      } else if (["Position", "Kill", "Killed", "BotKill", "BotKilled", "Loot"].includes(event)) {
+        if (id && !id.includes('Bot')) stats.humans.add(id);
       }
 
-      // Kill/Loot Logic
-      if (event.includes('Kill') || event.includes('Killed')) {
-        if (event.includes('ByStorm')) stats.envKills++;
-        else if (event.includes('Bot')) stats.botKills++;
-        else stats.pvpKills++;
-      } else if (event.includes('Loot')) stats.lootCount++;
-    });
-
-    // Identify stationary bots (those in list but not in moving set)
-    Object.keys(stats.posHistory).forEach(id => {
-      if (!stats.movingBots.has(id)) stats.stationaryBots.add(id);
+      // 2. Event Counting
+      switch (event) {
+        case "Kill": stats.pvpKills++; break;
+        case "BotKill": stats.botDeaths++; break;
+        case "BotKilled": stats.playerDeaths++; break;
+        case "KilledByStorm": stats.stormKills++; break;
+        case "Loot": stats.lootCount++; break;
+        default: break;
+      }
     });
 
     return {
       humanCount: stats.humans.size,
       movingBotCount: stats.movingBots.size,
-      stationaryBotCount: stats.stationaryBots.size,
       pvpKills: stats.pvpKills,
-      botKills: stats.botKills,
-      envKills: stats.envKills,
+      botDeaths: stats.botDeaths,
+      playerDeathsToBots: stats.playerDeaths,
+      stormKills: stats.stormKills,
       lootCount: stats.lootCount
     };
   }, [parquetData]);
@@ -413,17 +411,20 @@ const App = () => {
             {/* 6. Game Stats (New Line added) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', borderLeft: '1px solid #444', paddingLeft: '20px' }}>
               <label><strong>6. Game Stats</strong></label>
-              <div style={{ display: 'flex', gap: '8px', fontSize: '11px', background: '#000', padding: '4px 8px', borderRadius: '4px', height: '24px', alignItems: 'center', border: '1px solid #444' }}>
+              <div style={{ display: 'flex', gap: '10px', fontSize: '11px', background: '#000', padding: '4px 10px', borderRadius: '4px', height: '24px', alignItems: 'center', border: '1px solid #444', whiteSpace: 'nowrap' }}>
                 {matchStats ? (
                   <>
-                    <span style={{ color: '#00FF00' }}>Players: {matchStats.humanCount}</span>
-                    <span style={{ color: '#ffffff' }}>Bots (Live): {matchStats.movingBotCount}</span>
-                    <span style={{ color: '#FFFF00' }}>PvP: {matchStats.pvpKills}</span>
-                    <span style={{ color: '#FF4500' }}>BotDeath: {matchStats.botKills}</span>
-                    <span style={{ color: '#FF00FF' }}>Storm: {matchStats.envKills}</span>
-                    <span style={{ color: '#00FFFF' }}>Loot: {matchStats.lootCount}</span>
+                    <span style={{ color: '#fefffe' }}>Players: {matchStats.humanCount}</span>
+                    <span style={{ color: '#fefffe' }}>Bots (Live): {matchStats.movingBotCount}</span>
+                    <span style={{ color: '#fefffe' }}>PvP: {matchStats.pvpKills}</span>
+                    <span style={{ color: '#fefffe' }}>BotDeaths: {matchStats.botDeaths}</span>
+                    <span style={{ color: '#fefffe' }}>PlayerLost: {matchStats.playerDeathsToBots}</span>
+                    <span style={{ color: '#fefffe' }}>Storm: {matchStats.stormKills}</span>
+                    <span style={{ color: '#fefffe' }}>Loot: {matchStats.lootCount}</span>
                   </>
-                ) : <span style={{ color: '#666' }}>No data</span>}
+                ) : (
+                  <span style={{ color: '#666' }}>No telemetry loaded</span>
+                )}
               </div>
             </div>
           </>
