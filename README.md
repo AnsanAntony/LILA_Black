@@ -1,3 +1,6 @@
+**IMPORTANT NOTE THE MAP IMAGE MIGHT TAKE TIME TO LOAD AS THE SERVER IS A LITTLE SLOW** 
+
+
 LILA BLACK REPLAY ANALYTICS - USER GUIDE
 
     - This tool is designed to help you visualize and analyze your game telemetry data. Follow these instructions to get started.
