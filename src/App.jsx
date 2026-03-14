@@ -343,6 +343,9 @@ const App = () => {
       <header style={{ width: '100%', maxWidth: '1200px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>
         <div>
           <h2 style={{ margin: 0, letterSpacing: '1px' }}>LILA BLACK | Replay Analytics</h2>
+          <h3><a href="https://github.com/AnsanAntony/LILA_Black" target="_blank" rel="noopener noreferrer">
+  GitHub Link
+</a></h3>
           <small style={{ color: '#4caf50', fontWeight: 'bold' }}>{status}</small>
         </div>
         {parquetData && (
